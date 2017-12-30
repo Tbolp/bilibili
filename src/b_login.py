@@ -3,6 +3,7 @@ import requests
 import pickle
 import json
 import time
+from b_capture import *
 
 def save_cookie(c, fn):
     with open(fn, "wb") as f:
@@ -20,6 +21,7 @@ class Login(object):
     def __init__(self):
         self._session = requests.session()
         self._cookie_fn = "cookie"
+        self._capture = Capture()
 
     def __enter__(self):
         return self
@@ -28,7 +30,7 @@ class Login(object):
         save_cookie(self._session.cookies, self._cookie_fn)
         pass
 
-    def _is_login(self):
+    def is_login(self):
         session = self._session
         try:
             session.cookies = load_cookie(self._cookie_fn)
@@ -40,14 +42,14 @@ class Login(object):
                 return True
         except FileNotFoundError:
             return False
-        else:
+        except:
             return False
 
-    def login(self):
-        if self._is_login():
-            return True
-        key = self._get_qrcode("二维码已被保存到 QRCode.png,Ctrl+C 可退出")
-        session = self._session
+    @classmethod
+    def login(cls):
+        login = Login()
+        key = login._get_qrcode("二维码已被保存到 QRCode.png,Ctrl+C 可退出")
+        session = login._session
         try:
             while True:
                 url = "https://passport.bilibili.com/qrcode/getLoginInfo"
@@ -57,13 +59,12 @@ class Login(object):
                 info = json.loads(r.text)
                 if info["status"]:
                     print("登录成功")
-                    return True
                 elif info["data"] == -2:
-                    key = self._get_qrcode("二维码已更新,Ctrl+C 可退出")
+                    key = login._get_qrcode("二维码已更新,Ctrl+C 可退出")
                 time.sleep(5)
         except KeyboardInterrupt:
             print("再见")
-        return False
+        return login
 
     def get_reward(self):
         session = self._session
@@ -75,7 +76,7 @@ class Login(object):
                 print(info["msg"])
                 break
             info = info["data"]
-            self._get_single_reward(info["time_start"], info["time_end"], counts=0)
+            self._get_single_reward(info["time_start"], info["time_end"])
 
     def _get_single_reward(self, start, end, counts=3, manual=True):
         s = self._session
@@ -90,7 +91,7 @@ class Login(object):
             else:
                 print("已放弃本次奖励")
                 break;
-            r = s.get("https://api.live.bilibili.com/FreeSilver/getAward?time_start="+str(start)+"&end_time="+str(end)+"&captcha="+n)
+            r = s.get("https://api.live.bilibili.com/FreeSilver/getAward?time_start="+str(start)+"&end_time="+str(end)+"&captcha="+str(n))
             info = json.loads(r.text)
             if info["code"] == 0:
                 print("已成功领取"+str(info["data"]["awardSilver"])+"个瓜子")
@@ -102,7 +103,12 @@ class Login(object):
                 print("验证码过期")
 
     def _get_capture_data(self):
-        return "10"
+        r = self._session.get("https://api.live.bilibili.com/freeSilver/getCaptcha?ts=" + str(get_time()))
+        with open("capture.jpeg", "wb") as f:
+            f.write(r.content)
+        self._capture.load_file("capture.jpeg");
+        print("开始尝试。。。")
+        return self._capture.get_result()
 
     def _get_capture_data_manual(self):
         r = self._session.get("https://api.live.bilibili.com/freeSilver/getCaptcha?ts=" + str(get_time()))
@@ -123,6 +129,10 @@ class Login(object):
             print(msg)
         return key
 
-with Login() as l:
-    if l.login():
-        l.get_reward()
+l = Login()
+if l.is_login():
+    l.get_reward()
+else:
+    with Login.login() as l:
+        if l.login():
+            l.get_reward()
