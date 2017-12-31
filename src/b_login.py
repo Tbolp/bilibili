@@ -26,6 +26,7 @@ class TaskReward(object):
 
     def __init__(self, login):
         self._session = login.session
+        self._capture = Capture()
 
     def get_reward(self):
         session = self._session
