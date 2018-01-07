@@ -39,6 +39,7 @@ class TaskReward(object):
                 break
             info = info["data"]
             self._get_single_reward(info["time_start"], info["time_end"])
+            time.sleep(60)
 
     def _get_single_reward(self, start, end, counts=3, manual=True):
         s = self._session
@@ -63,6 +64,7 @@ class TaskReward(object):
                 count = count + 1
             elif info["code"] == -901:
                 print("验证码过期")
+            time.sleep(1);
 
     def _get_capture_data(self):
         r = self._session.get("https://api.live.bilibili.com/freeSilver/getCaptcha?ts=" + str(get_time()))
