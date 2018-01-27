@@ -4,7 +4,7 @@ import ssl
 import struct
 import re
 import asyncio
-import requests
+
 
 class DanMuProcess(object):
 
@@ -13,6 +13,7 @@ class DanMuProcess(object):
 
     def process_danmu(self):
         pass
+
 
 class DanMu(object):
 
@@ -26,21 +27,16 @@ class DanMu(object):
     def connect(self):
         self._enter_room()
         loop = asyncio.get_event_loop()
-        # asyncio.ensure_future(self._get_danmu())
-        # asyncio.ensure_future(self._keep_hearts())
-        loop.create_task(self._get_danmu())
+        tasks = asyncio.gather(self._get_danmu(), self._keep_hearts(), return_exceptions=KeyboardInterrupt())
         try:
-            loop.run_forever()
+            loop.run_until_complete(tasks)
         except KeyboardInterrupt:
-            for i in asyncio.Task.all_tasks():
-                print(i)
-                print(i.cancel())
+            tasks.cancel()
             loop.stop()
             loop.run_forever()
-            loop.close()
         finally:
+            loop.close()
             self._wss.close()
-
 
     def _enter_room(self):
         self._wss = websocket.create_connection(self._url, sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -59,6 +55,7 @@ class DanMu(object):
             for i in frames:
                 self.processer.process_danmu(i)
             await asyncio.sleep(0.2)
+            # raise ZeroDivisionError
 
     async def _keep_hearts(self):
         while True:
@@ -96,6 +93,7 @@ class DanMu(object):
         data = bytearray(b'\x00\x00\x00\x1f\x00\x10\x00\x01\x00\x00\x00\x02\x00\x00\x00\x01') + bytearray("object Object".encode())
         return data
 
+
 class RedPacket(DanMuProcess):
 
     def process_danmu(self, data):
@@ -104,17 +102,16 @@ class RedPacket(DanMuProcess):
                 print("获得奖励")
                 room_id = data["real_roomid"]
                 print(data["url"])
-                # self.get_redpacket(room_id)
+                self.get_redpacket(room_id)
         if data["cmd"] == "DANMU_MSG":
             print(data["info"][1])
-
 
     def get_redpacket(self, room_id):
         session = login.session
         # session.get("https://www.bilibili.com/plus/widget/ajaxGetCaptchaKey.php?js")
         custom_headers = {"Host": "api.live.bilibili.com",
                    "Origin": "http://live.bilibili.com",
-                   # "Referer": "http://live.bilibili.com/1223",
+                   "Referer": "http://live.bilibili.com/"+str(room_id),
                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/57.0"}
         resp = session.get("http://api.live.bilibili.com/activity/v1/Raffle/check", params={"roomid": room_id})
         js_resp = json.loads(resp.text)
@@ -122,12 +119,21 @@ class RedPacket(DanMuProcess):
         # requests.utils.add_dict_to_cookiejar(session.cookies, {"fts":str(int(time.time()))})
         # resp = session.get("http://api.live.bilibili.com/activity/v1/Common/welcomeInfo",params={"roomid":room_id})
         # print(resp.text)
+        # resp = session.post("https://api.live.bilibili.com/room/v1/Room/room_entry_action",
+        #              data={"room_id": 793902, "platform": "pc"})
+        # print(resp.text)
         resp = session.get("http://api.live.bilibili.com/activity/v1/Raffle/join", params={"roomid":room_id, "raffleId":raffle_id}, headers=custom_headers)
         print(resp.status_code, resp.text)
 
 
 
+with Login.login() as login:
+    danmu = DanMu(7734200)
+    danmu.set_listener(RedPacket())
+    danmu.connect()
 # with Login.login() as login:
-danmu = DanMu(66688)
-danmu.set_listener(RedPacket())
-danmu.connect()
+#     session = login.session
+#     csrf = login.session.cookies.get("bili_jct")
+#     print(csrf)
+#     rep = session.post("https://api.live.bilibili.com/room/v1/Room/room_entry_action", data={"room_id":793902, "platform":"pc"})
+#     print(rep.text)
