@@ -62,6 +62,7 @@ class TaskReward(object):
         return input("输入验证码: ")
 
 
-with Login.login() as l:
-    task = TaskReward(l)
-    task.get_reward()
+if __name__ == "_main__":
+    with Login.login() as l:
+        task = TaskReward(l)
+        task.get_reward()
