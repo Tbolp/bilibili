@@ -15,8 +15,7 @@ class RedPacket(DanMuProcess):
                 room_id = data["real_roomid"]
                 self.get_redpacket(room_id)
         # if data["cmd"] == "DANMU_MSG":
-        #     pass
-        #     # print(data["info"][1])
+        #     print(data["info"][1])
 
     def get_redpacket(self, room_id):
         session = self._login.session
@@ -51,6 +50,6 @@ class RedPacket(DanMuProcess):
 
 if __name__ == "__main__":
     with Login.login() as login:
-        danmu = DanMu(7734200)
+        danmu = DanMu(98284)
         danmu.set_listener(RedPacket(login))
         danmu.connect()

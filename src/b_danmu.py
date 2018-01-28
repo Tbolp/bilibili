@@ -39,6 +39,7 @@ class DanMu(object):
 
     def _enter_room(self):
         self._wss = websocket.create_connection(self._url, sslopt={"cert_reqs": ssl.CERT_NONE})
+        self._wss.settimeout(1)
         self._wss.send(self._generate_enter_frames(), websocket.ABNF.OPCODE_BINARY)
 
     def _change_room(self, id):
@@ -49,16 +50,19 @@ class DanMu(object):
 
     async def _get_danmu(self):
         while True:
-            data = self._wss.recv()
-            frames = self._analyze_frames(data)
-            for i in frames:
-                self._processor.process_danmu(i)
+            try:
+                data = self._wss.recv()
+                frames = self._analyze_frames(data)
+                for i in frames:
+                    self._processor.process_danmu(i)
+            except websocket.WebSocketTimeoutException:
+                pass
             await asyncio.sleep(0.2)
 
     async def _keep_hearts(self):
         while True:
             self._wss.send(DanMu._generate_heart_frames())
-            await asyncio.sleep(25)
+            await asyncio.sleep(30)
 
     def set_listener(self, listener):
         self._processor = listener
