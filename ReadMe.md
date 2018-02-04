@@ -4,7 +4,7 @@
 
     pip install pyqrcode 
     pip install requests 
-    pip install websocket
+    pip install websockets
 
 ## 自动获得银瓜子
     python b_taskreward.py

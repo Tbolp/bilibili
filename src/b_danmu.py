@@ -1,5 +1,4 @@
-import websocket
-import ssl
+import websockets
 import struct
 import asyncio
 import json
@@ -27,66 +26,47 @@ class DanMu(object):
 
     def __init__(self, id):
         self._roomId = id
-        self._processor = None
-        self._wss = websocket.WebSocket()
+        self._processor = DanMuProcess()
+        self._wss = None
 
     def connect(self):
-        logging.info("entering room")
-        self._enter_room()
-        logging.info("enter room {0}".format(self._roomId))
         loop = asyncio.get_event_loop()
-        tasks = asyncio.gather(self._get_danmu(), self._keep_hearts(), return_exceptions=KeyboardInterrupt())
         try:
-            loop.run_until_complete(tasks)
+            loop.run_until_complete(self._connect())
         except KeyboardInterrupt:
             logging.info("exiting")
-            tasks.cancel()
-            loop.stop()
+            for task in asyncio.Task.all_tasks():
+                task.cancel()
             loop.run_forever()
-        finally:
-            loop.close()
-            self._wss.close()
-            logging.info("exit")
+            raise KeyboardInterrupt
 
-    def _enter_room(self):
-        self._wss = websocket.create_connection(self._url, sslopt={"cert_reqs": ssl.CERT_NONE})
-        self._wss.settimeout(1)
-        self._wss.send(self._generate_enter_frames(), websocket.ABNF.OPCODE_BINARY)
-
-    def _change_room(self, id):
-        self._wss.close()
-        self._roomId = id
-        print(self._roomId)
-        self._enter_room()
+    async def _connect(self):
+        async with websockets.connect(DanMu._url) as wss:
+            self._wss = wss
+            await self._wss.send(self._generate_enter_frames())
+            danmmu_task = asyncio.ensure_future(self._get_danmu())
+            hearts_task = asyncio.ensure_future(self._keep_hearts())
+            await asyncio.wait([danmmu_task, hearts_task])
+            await danmmu_task
 
     async def _get_danmu(self):
         while True:
             try:
-                logging.info("start get danmu")
-                data = self._wss.recv()
-                logging.info("start analyzing danmu")
-                frames = self._analyze_frames(data)
-                logging.info("start processing danmu")
-                for i in frames:
-                    self._processor.process_danmu(i)
-            except websocket.WebSocketTimeoutException:
-                logging.info("get noting!")
-            except ConnectionResetError:
-                logging.warning("reset connection")
-                logging.warning(self._wss.connected)
-                self._wss.close()
-                self._enter_room()
-            except Exception as e:
-                logging.error(self._wss.connected)
-                logging.error("other exception: {0} say {1}".format(e.__class__, e))
-                raise KeyboardInterrupt
-            finally:
-                await asyncio.sleep(0.2)
+                data = await self._wss.recv()
+            except:
+                logging.warning("connection close")
+                break
+            frames = self._analyze_frames(data)
+            for i in frames:
+                self._processor.process_danmu(i)
 
     async def _keep_hearts(self):
         while True:
-            logging.info("send heartbeats")
-            self._wss.send(DanMu._generate_heart_frames())
+            try:
+                await self._wss.send(self._generate_heart_frames())
+            except:
+                logging.warning("connection close")
+                break
             await asyncio.sleep(30)
 
     def set_listener(self, listener):
@@ -117,4 +97,4 @@ class DanMu(object):
     @staticmethod
     def _generate_heart_frames():
         data = bytearray(b'\x00\x00\x00\x1f\x00\x10\x00\x01\x00\x00\x00\x02\x00\x00\x00\x01') + bytearray("object Object".encode())
-        return data
+        return bytes(data)

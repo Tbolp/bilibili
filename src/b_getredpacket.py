@@ -1,6 +1,7 @@
 from b_login import *
 from b_danmu import *
 import re
+import time
 
 
 class RedPacket(DanMuProcess):
@@ -9,11 +10,14 @@ class RedPacket(DanMuProcess):
         self._login = login
 
     def process_danmu(self, data):
-        if data["cmd"] == "SYS_GIFT":
-            if re.search("新春抽奖", data["msg_text"]):
-                print("开始获得奖励")
-                room_id = data["real_roomid"]
-                self.get_redpacket(room_id)
+        try:
+            if data["cmd"] == "SYS_GIFT":
+                if re.search("新春抽奖", data["msg_text"]):
+                    print(time.strftime("%H:%M:%S"), "开始获得奖励")
+                    room_id = data["real_roomid"]
+                    self.get_redpacket(room_id)
+        except Exception as e:
+            print("error {0}".format(e.__class__))
         # if data["cmd"] == "DANMU_MSG":
         #     print(data["info"][1])
 
@@ -37,7 +41,7 @@ class RedPacket(DanMuProcess):
         # print(resp.text)
         resp = session.get("http://api.live.bilibili.com/activity/v1/Raffle/join", params={"roomid":room_id, "raffleId":raffle_id}, headers=custom_headers)
         print(resp.json()["msg"])
-        print("当前红包数目： ",self.get_rednumber())
+        print("当前红包数目： {0}".format(self.get_rednumber()))
 
     def get_rednumber(self):
         session = self._login.session
@@ -52,4 +56,9 @@ if __name__ == "__main__":
     with Login.login() as login:
         danmu = DanMu(98284)
         danmu.set_listener(RedPacket(login))
-        danmu.connect()
+        print("开始任务")
+        try:
+            while login.is_login():
+                danmu.connect()
+        except KeyboardInterrupt:
+            print("结束任务")

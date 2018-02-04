@@ -69,7 +69,7 @@ class Login(object):
                 data = {"oauthKey": key,
                         "gourl": "https://www.bilibili.com/"}
                 r = session.post(url, data=data)
-                info = json.loads(r.text)
+                info = r.json()
                 if info["status"]:
                     print("登录成功")
                     return login
@@ -83,7 +83,7 @@ class Login(object):
 
     def _get_qrcode(self, fn="QRCode.png"):
         resp = self._session.get("https://passport.bilibili.com/qrcode/getLoginUrl")
-        info = json.loads(resp.text)
+        info = resp.json()
         url = info["data"]['url']
         key = info["data"]["oauthKey"]
         qrcode = pyqrcode.create(url)
